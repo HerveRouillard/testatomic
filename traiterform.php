@@ -5,58 +5,60 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-$result     = $_POST['json'];
-$order      = json_decode($result);
-$parcel     = $order->Delivery->Parcel;
-$sender     = $order->Delivery->Sender;
-$products   = $order->Products;
-$recipient  = $order->Delivery->Recipient;
-$invoice    = $order->Invoice;
-//traitement de l'obligatoire :
-$needed     = array('OrderID', 'OrderKey', 'OrderDate', 'Status', 'PaymentInfo', 'Currency',
-    'Delivery' => array(
-        'Parcel'    => array(
-            'ShippingProviderCode', 'ShippingProviderLib'
+$result = $_POST['json'];
+$orders = json_decode($result);
+foreach ($orders as $order) {
+    $parcel     = $order->Delivery->Parcel;
+    $sender     = $order->Delivery->Sender;
+    $products   = $order->Products;
+    $recipient  = $order->Delivery->Recipient;
+    $invoice    = $order->Invoice;
+    //traitement de l'obligatoire :
+    $needed     = array('OrderID', 'OrderKey', 'OrderDate', 'Status', 'PaymentInfo', 'Currency',
+        'Delivery' => array(
+            'Parcel'    => array(
+                'ShippingProviderCode', 'ShippingProviderLib'
+            ),
+            'Recipient' => array(
+                'RecipLastName', 'RecipAdr1', 'RecipCountryCode', 'RecipCity', 'RecipPhoneNumber', 'Recipemail',
+            )
         ),
-        'Recipient' => array(
-            'RecipLastName', 'RecipAdr1', 'RecipCountryCode', 'RecipCity', 'RecipPhoneNumber', 'Recipemail',
-        )
-    ),
-);
-$resultat   = array();
-$need_tarif = false;
+    );
+    $resultat   = array();
+    $need_tarif = false;
 // on verifie lee country lib
-if (!empty($recipient->RecipCountryCode)) {
-    $need_tarif = checkTarif($recipient->RecipCountryCode);
-}
-if ($need_tarif) {
-    $needed[]                       = 'InvoicingDate';
-    $needed[]                       = 'PaymentInfo';
-    $needed[]                       = 'PaymentInfo';
-    $needed['Delivery']['Parcel'][] = 'ParcelShippingPriceExclTax';
-    $needed['Delivery']['Parcel'][] = 'ParcelShippingTax';
-    $needed['Invoice']              = array('InvoiceKey', 'BillingLastName', 'BillingAdr1', 'BillingCountryLib', 'BillingCity',
-        'BillingZipCode');
-}
+    if (!empty($recipient->RecipCountryCode)) {
+        $need_tarif = checkTarif($recipient->RecipCountryCode);
+    }
+    if ($need_tarif) {
+        $needed[]                       = 'InvoicingDate';
+        $needed[]                       = 'PaymentInfo';
+        $needed[]                       = 'PaymentInfo';
+        $needed['Delivery']['Parcel'][] = 'ParcelShippingPriceExclTax';
+        $needed['Delivery']['Parcel'][] = 'ParcelShippingTax';
+        $needed['Invoice']              = array('InvoiceKey', 'BillingLastName', 'BillingAdr1', 'BillingCountryLib', 'BillingCity',
+            'BillingZipCode');
+    }
 
 //traitement des produits
-foreach ($products as $produit) {
-    if (empty($produit->SKU)) {
-        $resultat[] = 'SKU manquant';
+    foreach ($products as $produit) {
+        if (empty($produit->SKU)) {
+            $resultat[] = 'SKU manquant';
+        }
+        if (empty($produit->Quantity)) {
+            $resultat[] = 'Quantité manquante';
+        }
+        if ($need_tarif && empty($produit->SubTotalPriceExclTax)) {
+            $resultat[] = 'SubTotalPriceExclTax';
+        }
+        if ($need_tarif && empty($produit->SubTotalTax)) {
+            $resultat[] = 'SubTotalTax';
+        }
     }
-    if (empty($produit->Quantity)) {
-        $resultat[] = 'Quantité manquante';
-    }
-    if ($need_tarif && empty($produit->SubTotalPriceExclTax)) {
-        $resultat[] = 'SubTotalPriceExclTax';
-    }
-    if ($need_tarif && empty($produit->SubTotalTax)) {
-        $resultat[] = 'SubTotalTax';
-    }
-}
 
 // on test les produits
-tester($needed, $order, $resultat);
+    tester($needed, $order, $resultat);
+}
 
 function tester($needed, $order, &$resultat)
 {
